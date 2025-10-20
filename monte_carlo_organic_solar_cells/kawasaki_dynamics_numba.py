@@ -88,8 +88,8 @@ def _kawasaki_attempt_nb(spins, nn1, nn2, J1, J2, kT):
     k2 = (z + dz) % nz
 
     if spins[x, y, z] == spins[i2, j2, k2]:
-        return 0  # no change if same spin
-
+        return spins 
+    
     # energy before
     Eb = _local_energy_nb(spins, x, y, z, nn1, nn2, J1, J2) \
        + _local_energy_nb(spins, i2, j2, k2, nn1, nn2, J1, J2)
@@ -113,9 +113,8 @@ def _kawasaki_attempt_nb(spins, nn1, nn2, J1, J2, kT):
         s = spins[x, y, z]
         spins[x, y, z] = spins[i2, j2, k2]
         spins[i2, j2, k2] = s
-        return 0
     
-    return 1
+    return spins
 
 
 @njit
@@ -127,8 +126,8 @@ def _kawasaki_mcs_nb(spins, nn1, nn2, J1, J2, kT):
     nsites = spins.size
     acc = 0
     for _ in range(nsites):
-        acc += _kawasaki_attempt_nb(spins, nn1, nn2, J1, J2, kT)
-    return acc
+        spins = _kawasaki_attempt_nb(spins, nn1, nn2, J1, J2, kT)
+    return spins
 
 
 @njit
@@ -174,13 +173,13 @@ def ising_model(lattice, steps=1000, sample_points=100, kT=T):
     sample_every = max(1, steps // max(1, sample_points))
 
     for mcs in range(int(steps)):
-        acc = _kawasaki_mcs_nb(spins, first_neighbour_offsets, second_neighbour_offsets, J1, J2, kT)
+        spins = _kawasaki_mcs_nb(spins, first_neighbour_offsets, second_neighbour_offsets, J1, J2, kT)
 
         if (mcs % sample_every) == 0:
             E_list.append(calculate_total_energy(spins))
 
         if (mcs % max(1, steps // 10)) == 0:
-            print(f"{mcs/steps*100:.1f}% complete (accepted {acc} moves)")
+            print(f"{mcs/steps*100:.1f}% complete")
 
     return spins, E_list
 
@@ -219,7 +218,7 @@ def plot_lattice_3d(lattice, downsample_factor=2):
 if __name__ == '__main__':
         
     lattice = np.random.choice([-1, 1], size=lattice_size)
-    lattice, E = ising_model(lattice, steps=0)
+    lattice, E = ising_model(lattice, steps=9e5)
     print("Energy samples:", len(E))
     area_nm2, bonds = compute_interfacial_area(lattice, lattice_constant)
 
